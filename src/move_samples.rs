@@ -5,6 +5,8 @@ use std::path::Component;
 use glob::glob;
 use m8_files::{reader::*, Instrument};
 
+use crate::types::combine;
+use crate::types::FlagBag;
 use crate::types::M8FstoErr;
 
 enum Swap {
@@ -13,18 +15,6 @@ enum Swap {
 }
 
 impl Swap {
-    pub fn apply_fs(&self) -> Result<(), M8FstoErr> {
-        match self {
-            Swap::Dir { from, to } => {
-                std::fs::rename(from, to).map_err(| _| M8FstoErr::RenameFailure { path: from.clone() })
-            }
-            Swap::File { from, to } => {
-                println!("MOVING FILE {:?} -> {:?}", from, to);
-                std::fs::rename(from, to).map_err(| _| M8FstoErr::RenameFailure { path: from.clone() })
-            }
-        }
-    }
-
     pub fn try_swap(&self, sample_path: &str) -> Option<String> {
         match self {
             Swap::File { from, to } if sample_path == from =>
@@ -42,12 +32,42 @@ impl Swap {
     }
 }
 
-struct SwappedFile {
-    file_data : Vec<u8>,
-    touched: Vec<(usize, String, String, String)>
+/// Keep track of a modified sample instrument
+pub struct SwappedInstruments {
+    /// Instrument number in the file
+    pub instrument: usize,
+
+    /// Original instrument name
+    pub instrument_name: String,
+
+    /// Original sample path (useful to get when
+    /// moving a whole sample folder)
+    pub original_sample_path: String,
+
+    /// Final sample path after replacement.
+    pub new_sample_path: String
 }
 
-fn on_file_blob(dry_run: bool, swap: &Swap, path: &Path, data: Vec<u8>) -> Result<Option<SwappedFile>, M8FstoErr> {
+impl SwappedInstruments {
+    fn print(&self) {
+        println!(
+            " - {} {} \"{}\" -> \"{}\"",
+            self.instrument,
+            self.instrument_name,
+            self.original_sample_path,
+            self.new_sample_path)
+    }
+}
+
+/// Result of song file modification
+struct SwappedFile {
+    /// Song data ready to be written on disk
+    file_data : Vec<u8>,
+    /// List of updated instruments
+    touched: Vec<SwappedInstruments>
+}
+
+fn on_file_blob(flags: &FlagBag, swap: &Swap, path: &Path, data: Vec<u8>) -> Result<Option<SwappedFile>, M8FstoErr> {
     let mut reader = Reader::new(data.clone());
     let mut touched = vec![];
     let mut song = m8_files::Song::read_from_reader(&mut reader)
@@ -56,13 +76,18 @@ fn on_file_blob(dry_run: bool, swap: &Swap, path: &Path, data: Vec<u8>) -> Resul
             reason: format!("{:?}", e)
         })?;
 
-    for (i, instr) in song.instruments.iter_mut().enumerate() {
+    for (instrument, instr) in song.instruments.iter_mut().enumerate() {
         match instr {
             Instrument::Sampler(sampler) => {
                 match swap.try_swap(&sampler.sample_path) {
                     None => {}
                     Some(new_path) => {
-                        touched.push((i, sampler.name.clone(), sampler.sample_path.clone(), new_path.clone()));
+                        touched.push(SwappedInstruments {
+                            instrument,
+                            instrument_name: sampler.name.clone(),
+                            original_sample_path: sampler.sample_path.clone(),
+                            new_sample_path: new_path.clone()
+                        });
                         sampler.sample_path = new_path;
                     }
                 }
@@ -71,32 +96,33 @@ fn on_file_blob(dry_run: bool, swap: &Swap, path: &Path, data: Vec<u8>) -> Resul
         }
     }
 
-    if touched.len() > 0 {
-        if dry_run {
-            return Ok(Some(SwappedFile {
-                file_data: Vec::new(),
-                touched
-            }))
-        }
+    if touched.len() == 0 { return Ok(None);}
 
-        let mut writer =
-            m8_files::writer::Writer::new(data);
-        println!("SONG VER: {:?}", song.version);
-        song.write(&mut writer)
-            .map_err(|reason| M8FstoErr::SongSerializationError { reason })?;
-
-        Ok(Some(SwappedFile {
-            file_data: writer.finish(),
+    if flags.dry_run {
+        return Ok(Some(SwappedFile {
+            file_data: Vec::new(),
             touched
         }))
-    } else {
-        Ok(None)
     }
 
+    let mut writer =
+        m8_files::writer::Writer::new(data);
+
+    song.write(&mut writer)
+        .map_err(|reason|
+            M8FstoErr::SongSerializationError {
+                reason,
+                destination: format!("{:?}", path)
+            })?;
+
+    Ok(Some(SwappedFile {
+        file_data: writer.finish(),
+        touched
+    }))
 }
 
-fn on_dir(force: bool, dry_run : bool, cwd: &Path, swap: &Swap) -> Result<(), M8FstoErr> {
-    let mut errors = vec![];
+fn on_dir(flags: &FlagBag, cwd: &Path, swap: &Swap) -> Result<(), M8FstoErr> {
+    let mut errors = None;
     let mut matched_not_serializable = vec![];
     let mut to_write= vec![];
     let search_pattern =
@@ -110,30 +136,24 @@ fn on_dir(force: bool, dry_run : bool, cwd: &Path, swap: &Swap) -> Result<(), M8
                 let try_as_file = fs::read(&path);
                 match try_as_file {
                     Err(e) => {
-                        errors.push(M8FstoErr::CannotReadFile {
+                        errors = combine(errors, M8FstoErr::CannotReadFile {
                             path: path.to_path_buf(),
                             reason: format!("{:?}", e)
                         })
                     }
                     Ok(file_blob) => {
-                        match on_file_blob(dry_run, swap, &path, file_blob) {
+                        match on_file_blob(flags, swap, &path, file_blob) {
                             Ok(None) => {}
-                            Err(M8FstoErr::SongSerializationError { reason: _ }) => matched_not_serializable.push(path),
-                            Err(m8err) => errors.push(m8err),
-                            Ok(Some(swapped)) if dry_run => {
-                                println!("Song {:?}", &path);
-                                for (inst, name, path, new_path) in swapped.touched {
-                                    println!(" - {} {} \"{}\" -> \"{}\"", inst, name, path, new_path)
-                                }
-                            }
+                            Err(M8FstoErr::SongSerializationError { reason: _, destination}) =>
+                                matched_not_serializable.push(destination),
+                            Err(m8err) =>
+                                errors = combine(errors, m8err),
                             Ok(Some(swapped)) => {
-                                println!("Song {:?}", &path);
-                                for (inst, name, path, new_path) in swapped.touched {
-                                    println!(" - {} {} \"{}\" -> \"{}\"", inst, name, path, new_path)
+                                for touched in swapped.touched {
+                                    touched.print()
                                 }
 
                                 to_write.push((path, swapped.file_data));
-                                
                             }
                         }
                     }
@@ -144,23 +164,24 @@ fn on_dir(force: bool, dry_run : bool, cwd: &Path, swap: &Swap) -> Result<(), M8
 
     // If we have some file we can't translate, but still want to write
     // the files
-    if matched_not_serializable.len() == 0 || force {
+    if !flags.dry_run && (matched_not_serializable.len() == 0 || flags.force) {
         for (path, data) in to_write {
             match fs::write(&path, data) {
                 Ok(()) => {}
                 Err(_) => {
-                    errors.push(M8FstoErr::SongSerializationError { reason: format!("Error while writing file {:?}", path) });
+                    errors = combine(errors, 
+                        M8FstoErr::SongSerializationError {
+                            reason: "Error while writing file".into(),
+                            destination: format!("{:?}", path)
+                        });
                 }
             }
         }
     }
 
-    if errors.len() == 0 {
-        Ok(())
-    } else if errors.len() == 1 {
-        Err(errors[0].clone())
-    } else {
-        Err(M8FstoErr::MultiErrs { inner: errors })
+    match errors {
+        None => Ok(()),
+        Some(errs) => Err(errs)
     }
 }
 
@@ -193,12 +214,18 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 }
 
 
-pub fn move_samples(cwd: &Path, force: bool, dry_run: bool, from: String, to: String) -> Result<(), M8FstoErr> {
+pub fn move_samples(
+    cwd: &Path,
+    flags: FlagBag,
+    from: String,
+    to: String) -> Result<(), M8FstoErr> {
+
     let cwd = normalize_path(cwd);
 
-    println!("CWD: {:?}", cwd);
-    println!("FROM: {:?}", from);
-    println!("TO: {:?}", to);
+    if flags.verbose {
+        println!("Using backup at location: {:?}", cwd);
+    }
+
     let from_path = PathBuf::from(from);
     if !from_path.exists() {
         return Err(M8FstoErr::InvalidPath { reason: format!("Folder {:?} doesn't exists", from_path) })
@@ -216,7 +243,10 @@ pub fn move_samples(cwd: &Path, force: bool, dry_run: bool, from: String, to: St
 
     let from_canon = normalize_path(&from_path);
     
-    println!("FROM_CANON {:?}", from_canon);
+    if flags.verbose {
+        println!(" * moving source {:?}", from_canon);
+    }
+
     let rel_from =
         from_canon.strip_prefix(&cwd)
             .map_err(| _| M8FstoErr::InvalidPath { reason: "from relativisation error".into() })?
@@ -224,8 +254,10 @@ pub fn move_samples(cwd: &Path, force: bool, dry_run: bool, from: String, to: St
             .unwrap()
             .replace("\\","/");
 
-    println!("REL_FROM {:?}", rel_from);
-    println!("TO_CANON {:?}", to_canon);
+    if flags.verbose {
+        println!(" * to {:?}", to_canon);
+    }
+
     let rel_to =
         to_canon.strip_prefix(&cwd)
             .map_err(| _| M8FstoErr::InvalidPath { reason: "destination canonicalization error".into() })?
@@ -233,8 +265,6 @@ pub fn move_samples(cwd: &Path, force: bool, dry_run: bool, from: String, to: St
             .unwrap()
             .replace("\\","/");
 
-    println!("REL_TO {:?}", rel_to);
-    println!("dry_run: {:?}", dry_run);
     let move_order =
         if from_path.is_dir() {
             Swap::Dir {
@@ -250,15 +280,19 @@ pub fn move_samples(cwd: &Path, force: bool, dry_run: bool, from: String, to: St
             return Err(M8FstoErr::CannotReadFile { path: from_path, reason: String::from("Neither file nor directory")})
         };
 
-    match on_dir(force, dry_run, &cwd, &move_order) {
+    match on_dir(&flags, &cwd, &move_order) {
         Ok(()) => {
             std::fs::rename(&from_canon, to_canon)
                 .map_err(|_| M8FstoErr::RenameFailure { path: format!("{:?}", from_canon) })
         }
-        Err(errs) if force => {
-            std::fs::rename(&from_canon, to_canon)
-                .map_err(|_| M8FstoErr::RenameFailure { path: format!("{:?}", from_canon) })?;
-            Err(errs)
+        Err(errs) if flags.force => {
+            match std::fs::rename(&from_canon, to_canon) {
+                Ok(()) => Err(errs),
+                Err(_) => {
+                    let path = format!("{:?}", from_canon);
+                    Err(errs.combine(M8FstoErr::RenameFailure { path }))
+                }
+            }
         }
         Err(errs) => Err(errs)
     }

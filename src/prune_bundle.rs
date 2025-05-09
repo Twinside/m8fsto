@@ -1,9 +1,9 @@
 use std::{collections::HashSet, fs, path::{Path, PathBuf}};
 use m8_files::{reader::*, Instrument};
 
-use crate::{broken_search::is_sample_absolute, types::M8FstoErr};
+use crate::{broken_search::is_sample_absolute, types::{FlagBag, M8FstoErr}};
 
-fn on_file_blob(dry_run : bool, song_path: &Path, data: Vec<u8>) -> Result<(), M8FstoErr> {
+fn on_file_blob(flags : FlagBag, song_path: &Path, data: Vec<u8>) -> Result<(), M8FstoErr> {
     let mut reader = Reader::new(data.clone());
     let song = m8_files::Song::read_from_reader(&mut reader)
         .map_err(|e| M8FstoErr::UnparseableM8File {
@@ -57,7 +57,7 @@ fn on_file_blob(dry_run : bool, song_path: &Path, data: Vec<u8>) -> Result<(), M
         return Ok(())
     }
 
-    if dry_run {
+    if flags.dry_run {
         println!("Extra samples to be removed:");
         for pb in &to_remove {
             println!(" * '{:?}'", pb);
@@ -75,12 +75,12 @@ fn on_file_blob(dry_run : bool, song_path: &Path, data: Vec<u8>) -> Result<(), M
 }
 
 /// Try to list sample of a given path
-pub fn prune_bundle(dry_run: bool, path : &str) -> Result<(), M8FstoErr> {
+pub fn prune_bundle(flags: FlagBag, path : &str) -> Result<(), M8FstoErr> {
     let file_blob = fs::read(path)
         .map_err(|e|
             M8FstoErr::CannotReadFile { path: PathBuf::from(path), reason: format!("{:?}", e) })?;
 
     let song_path = Path::new(path);
 
-    on_file_blob(dry_run, song_path, file_blob)
+    on_file_blob(flags, song_path, file_blob)
 }

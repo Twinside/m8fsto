@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use types::M8FstoErr;
+use types::{FlagBag, M8FstoErr};
 
 mod ls_sample;
 mod grep_sample;
@@ -132,7 +132,13 @@ fn main() {
             print_errors(bundle::bundle_song(root.as_path(), &song, &out_folder))
         }
         Some(M8Commands::PruneBundle { dry_run, song}) => {
-            print_errors(prune_bundle::prune_bundle(dry_run, &song))
+            let flags = FlagBag {
+                dry_run,
+                force: false,
+                verbose: false
+            };
+
+            print_errors(prune_bundle::prune_bundle(flags, &song))
         },
         Some(M8Commands::Mv { root, force, dry_run, from, to }) => {
             let root = root
@@ -140,7 +146,13 @@ fn main() {
                     || cwd.as_path().to_path_buf(),
                      |f| PathBuf::from(f));
 
-            print_errors(move_samples::move_samples(&root, force, dry_run, from, to));
+            let flags = FlagBag {
+                dry_run,
+                force,
+                verbose: false
+            };
+
+            print_errors(move_samples::move_samples(&root, flags, from, to));
         }
     }
 }

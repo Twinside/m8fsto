@@ -86,10 +86,18 @@ fn on_file_blob(backup_root: &Path, song_path: &Path, out_folder: &Path, data: V
 
     let mut writer = Writer::new(data);
     song.write(&mut writer)
-        .map_err(|reason| M8FstoErr::SongSerializationError { reason })?;
+        .map_err(|reason|
+            M8FstoErr::SongSerializationError { 
+                destination: format!("{:?}", &out_song_name),
+                reason
+            })?;
 
-    std::fs::write(out_song_name, writer.finish())
-        .map_err(|reason| M8FstoErr::SongSerializationError { reason: format!("{:?}", reason) })?;
+    std::fs::write(&out_song_name, writer.finish())
+        .map_err(|reason|
+            M8FstoErr::SongSerializationError {
+                destination: format!("{:?}", out_song_name),
+                reason: format!("{:?}", reason)
+            })?;
     
     Ok(())
 }
