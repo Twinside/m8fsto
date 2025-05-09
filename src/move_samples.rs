@@ -19,6 +19,7 @@ impl Swap {
                 std::fs::rename(from, to).map_err(| _| M8FstoErr::RenameFailure { path: from.clone() })
             }
             Swap::File { from, to } => {
+                println!("MOVING FILE {:?} -> {:?}", from, to);
                 std::fs::rename(from, to).map_err(| _| M8FstoErr::RenameFailure { path: from.clone() })
             }
         }
@@ -80,6 +81,7 @@ fn on_file_blob(dry_run: bool, swap: &Swap, path: &Path, data: Vec<u8>) -> Resul
 
         let mut writer =
             m8_files::writer::Writer::new(data);
+        println!("SONG VER: {:?}", song.version);
         song.write(&mut writer)
             .map_err(|reason| M8FstoErr::SongSerializationError { reason })?;
 
@@ -191,9 +193,12 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 }
 
 
-pub fn move_samples(cwd: &Path, dry_run: bool, from: String, to: String) -> Result<(), M8FstoErr> {
+pub fn move_samples(cwd: &Path, force: bool, dry_run: bool, from: String, to: String) -> Result<(), M8FstoErr> {
     let cwd = normalize_path(cwd);
 
+    println!("CWD: {:?}", cwd);
+    println!("FROM: {:?}", from);
+    println!("TO: {:?}", to);
     let from_path = PathBuf::from(from);
     if !from_path.exists() {
         return Err(M8FstoErr::InvalidPath { reason: format!("Folder {:?} doesn't exists", from_path) })
@@ -211,6 +216,7 @@ pub fn move_samples(cwd: &Path, dry_run: bool, from: String, to: String) -> Resu
 
     let from_canon = normalize_path(&from_path);
     
+    println!("FROM_CANON {:?}", from_canon);
     let rel_from =
         from_canon.strip_prefix(&cwd)
             .map_err(| _| M8FstoErr::InvalidPath { reason: "from relativisation error".into() })?
@@ -218,6 +224,8 @@ pub fn move_samples(cwd: &Path, dry_run: bool, from: String, to: String) -> Resu
             .unwrap()
             .replace("\\","/");
 
+    println!("REL_FROM {:?}", rel_from);
+    println!("TO_CANON {:?}", to_canon);
     let rel_to =
         to_canon.strip_prefix(&cwd)
             .map_err(| _| M8FstoErr::InvalidPath { reason: "destination canonicalization error".into() })?
@@ -225,6 +233,8 @@ pub fn move_samples(cwd: &Path, dry_run: bool, from: String, to: String) -> Resu
             .unwrap()
             .replace("\\","/");
 
+    println!("REL_TO {:?}", rel_to);
+    println!("dry_run: {:?}", dry_run);
     let move_order =
         if from_path.is_dir() {
             Swap::Dir {
