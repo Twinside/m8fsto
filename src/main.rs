@@ -4,6 +4,8 @@ use clap::{Parser, Subcommand};
 use clap_num::maybe_hex;
 use types::{FlagBag, M8FstoErr};
 
+use crate::renumber::renumber_element;
+
 mod ls_sample;
 mod grep_sample;
 mod bundle;
@@ -12,6 +14,7 @@ mod broken_search;
 mod types;
 mod show_song;
 mod move_samples;
+mod renumber;
 
 #[derive(Parser)]
 #[command(version, about, long_about=None)]
@@ -80,9 +83,35 @@ struct ShowCommand {
     pub file: String
 }
 
+/// What do we want to print, prefix with 0x to use hexadecimal notation.
+#[derive(Subcommand)]
+enum RenumberTarget {
+    /// Print the content of a phrase
+    Instrument {
+        #[clap(value_parser=maybe_hex::<usize>)]
+        from: usize,
+
+        #[clap(value_parser=maybe_hex::<usize>)]
+        to: usize,
+    },
+}
+
+#[derive(Parser)]
+struct RenumberCommand {
+    #[structopt(subcommand)]
+    pub renum_command: RenumberTarget,
+
+    /// File to display
+    pub file: String
+}
+
 #[derive(Subcommand)]
 enum M8Commands {
+    /// Show an element of the song
     Show(ShowCommand),
+
+    /// Renumber an element of the M8
+    // Renumber(RenumberCommand),
 
     /// List samples used in M8 song file
     LsSample {
@@ -174,6 +203,10 @@ fn main() {
 
     match cli.command {
         None => { println!("Please use a command") }
+        /*
+        Some(M8Commands::Renumber(recommand)) => {
+            print_errors(renumber::renumber_element(recommand, &mut stdout()));
+        } */
         Some(M8Commands::Show(showcmd)) => {
             print_errors(show_song::show_element(showcmd, &mut stdout()));
         }
