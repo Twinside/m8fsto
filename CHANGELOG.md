@@ -1,9 +1,10 @@
 # M8fsto changelog
 
-## vNext
+## v0.6
  
  * Minor fix in `broken-search`
  * Display some information about instruments
+ * Firmware 6.2 handling
   
 
 ## v0.5.1
