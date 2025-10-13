@@ -13,6 +13,7 @@ mod types;
 mod show_song;
 mod move_samples;
 mod renumber;
+mod chord_gen;
 
 #[derive(Parser)]
 #[command(version, about, long_about=None)]
@@ -124,6 +125,8 @@ enum M8Commands {
         path: Option<String>
     },
 
+    Chords,
+
     /// Try to find songs that are using a given sample
     GrepSample {
         /// Pattern to search, representing a sample file path using
@@ -208,6 +211,9 @@ fn main() {
 
     match cli.command {
         None => { println!("Please use a command") }
+        Some(M8Commands::Chords) => {
+            print_errors(chord_gen::generate());
+        }
         Some(M8Commands::Renumber(recommand)) => {
             print_errors(renumber::renumber_element(recommand, &mut stdout()));
         }

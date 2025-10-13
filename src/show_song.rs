@@ -367,10 +367,10 @@ pub fn show_element(show: ShowCommand, w: &mut dyn std::io::Write) -> Result<(),
             reader.set_pos(0);
             match m8_file_parser::Instrument::read_from_reader(&mut reader) {
                 Ok(instr_eq) => show_from_instrument(show, w, instr_eq),
-                Err(_) => {
+                Err(ei) => {
                     Err(M8FstoErr::UnparseableM8File {
                         path: song_path,
-                        reason: format!("{:?}", e)
+                        reason: format!("{:?}\n{:?}", e, ei)
                     })
                 }
             }
