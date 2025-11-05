@@ -1,5 +1,5 @@
 use m8_file_parser::writer::Writer;
-use m8_file_parser::{ AHDEnv, FMWave, FmAlgo, Instrument, InstrumentWithEq, LfoShape, LimitType, Mod, Operator, SynthParams, Table, Version, LFO };
+use m8_file_parser::{ AHDEnv, FMWave, FmAlgo, HyperSynth, Instrument, InstrumentWithEq, LfoShape, LimitType, Mod, Operator, SynthParams, Table, Version, LFO };
 use m8_file_parser::FMSynth;
 
 use crate::types::M8FstoErr;
@@ -52,7 +52,53 @@ impl Chord {
         }
     }
 
-    pub fn as_fm(&self, inversion: u8) -> FMSynth {
+    /// encode all the inversions as chords inside the hypersynth.
+    pub fn as_hypersynth(&self) -> HyperSynth {
+        let mut chords : [m8_file_parser::Chord; 0x10] = Default::default();
+        let mut default_chord : [u8; 7] = Default::default();
+
+        for (i, ofs) in self.offsets.iter().enumerate() {
+            default_chord[i + 1] = *ofs as u8;
+        }
+
+        let mut ofs = self.offsets.clone();
+        let mut mutate_cursor = 8;
+
+        for i in 0 .. ofs.len() {
+            if mutate_cursor >= ofs.len() {
+                mutate_cursor = 0;
+            } else {
+                ofs[mutate_cursor] += 12; // octave up!
+                mutate_cursor += 1;
+            }
+
+            let mut mask = 0xC0;
+            let max = (chords[i].offsets.len() / ofs.len()) * ofs.len();
+            for write_cursor in 0 .. max {
+                chords[i].offsets[write_cursor] = ofs[write_cursor % ofs.len()] as u8;
+                mask = mask | (1 << write_cursor);
+            }
+
+            chords[i].mask = mask
+        }
+
+        HyperSynth {
+            number: 0,
+            name: self.name.clone(),
+            transpose: true,
+            table_tick: 1,
+            synth_params: Self::make_synth_param(),
+            scale: 0x00,
+            default_chord,
+            shift: 0x80,
+            swarm: 0,
+            width: 0,
+            subosc: 0x80,
+            chords
+        }
+    }
+
+    fn make_synth_param() -> SynthParams {
         let ahd = AHDEnv {
             dest: 0,
             amount: 0xFF,
@@ -70,19 +116,7 @@ impl Chord {
             retrigger: 0,
         };
 
-        let operators = [
-            if self.offsets.len() > 3 {
-                self.make_op(3)
-            } else {
-                self.make_mod_op()
-            },
-
-            self.make_op(2),
-            self.make_op(1),
-            self.make_op(0)
-        ];
-
-        let synth_params = SynthParams {
+        SynthParams {
             volume: 0x0,
             pitch: 0,
             fine_tune: 0x80,
@@ -99,17 +133,35 @@ impl Chord {
             associated_eq: 0x80,
             mods: [
                 Mod::AHDEnv(ahd.clone()),
-                Mod::AHDEnv(ahd.clone()),
+                Mod::AHDEnv(ahd),
                 Mod::LFO(lfo.clone()),
-                Mod::LFO(lfo.clone()),
+                Mod::LFO(lfo),
             ],
+        }
+    }
+
+    pub fn as_fm(&self, inversion: u8) -> FMSynth {
+        let mk_op = |i| {
+            if self.offsets.len() > i {
+                self.make_op(i)
+            } else {
+                self.make_mod_op()
+            }
         };
 
+        let operators = [
+            mk_op(3),
+            mk_op(2),
+            mk_op(1),
+            mk_op(0)
+        ];
+
         let algo =
-            if self.offsets.len() == 4 {
-                FmAlgo(0xB)
-            } else {
-                FmAlgo(0x8)
+            match self.offsets.len() {
+                4 => FmAlgo(0xB),
+                3 => FmAlgo(0x8),
+                2 => FmAlgo(0x7),
+                _ => FmAlgo(0x0),
             };
 
         FMSynth { 
@@ -122,7 +174,7 @@ impl Chord {
                 },
             transpose: true,
             table_tick: 1,
-            synth_params,
+            synth_params: Self::make_synth_param(),
             algo,
             operators,
             mod1: 0,
@@ -148,16 +200,18 @@ fn build_chords() -> Vec<Chord> {
         Chord::make("DIM", vec![0, 3, 6]),
         Chord::make("DIM7", vec![0, 3, 6, 9]),
         Chord::make("HDIM7", vec![0, 3, 6, 10]),
+        Chord::make("POW", vec![0, 7]),
+        Chord::make("POW_AUG", vec![0, 7, 12]),
     ]
 }
 
-fn wrap(synth: FMSynth) -> InstrumentWithEq {
+fn wrap(synth: Instrument) -> InstrumentWithEq {
     let ver = Version {
         major: 4, minor: 2, patch: 0
     };
 
     InstrumentWithEq {
-        instrument: Instrument::FMSynth(synth),
+        instrument: synth,
         table: Table::default_ver(ver),
         eq: None,
         version: ver,
@@ -177,7 +231,7 @@ pub fn generate() -> Result<(), M8FstoErr> {
         })?;
 
         let instrument =
-            wrap(chord.as_fm(0));
+            wrap(Instrument::FMSynth(chord.as_fm(0)));
 
         let mut w = Writer::new_instrument_writer(false);
         let instr_name = format!("{}/{}.m8i", &folder_prefix, &chord.name);
@@ -194,8 +248,8 @@ pub fn generate() -> Result<(), M8FstoErr> {
         for inversion in 0 .. chord.len() - 1 {
             let instr_name = format!("{}/{}_INV{}.m8i", &folder_prefix, &chord.name, inversion);
             cchord.offsets[inversion] += 12;
-            let inv_instr =
-                wrap(cchord.as_fm((inversion + 1) as u8));
+            let as_fm = cchord.as_fm((inversion + 1) as u8);
+            let inv_instr = wrap(Instrument::FMSynth(as_fm));
             let mut inv_w = Writer::new_instrument_writer(false);
             inv_instr.write(&mut inv_w);
             std::fs::write(&instr_name, &inv_w.finish())
@@ -205,6 +259,19 @@ pub fn generate() -> Result<(), M8FstoErr> {
                         reason: format!("{}", err)
                     })?;
         }
+
+        let hs_chord =
+            wrap(Instrument::HyperSynth(chord.as_hypersynth()));
+        let hs_instr_name = format!("{}/{}_HS.m8i", &folder_prefix, &chord.name);
+
+        let mut hs_w = Writer::new_instrument_writer(false);
+        hs_chord.write(&mut hs_w);
+        std::fs::write(&hs_instr_name, &hs_w.finish())
+            .map_err(|err|
+                M8FstoErr::SongSerializationError {
+                    destination: hs_instr_name.clone(),
+                    reason: format!("{}", err)
+                })?;
     }
 
     Ok(())
