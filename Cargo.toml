@@ -1,7 +1,7 @@
 [package]
 name = "m8fsto"
 description = "Command line song file helper"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 repository = "https://github.com/Twinside/m8fsto"
 homepage = "https://github.com/Twinside/m8fsto"
@@ -14,7 +14,7 @@ clap-num = "1.2.0"
 glob = "0.3.2"
 # m8-file-parser = { git = "https://github.com/Twinside/m8-file-parser.git" }
 # m8-file-parser = { path = "../m8-file-parser" }
-m8-file-parser = "0.6.0"
+m8-file-parser = "0.6.1"
 
 [features]
 # Used to fix warnings stemming from array-concat
