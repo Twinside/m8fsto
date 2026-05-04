@@ -248,6 +248,7 @@ impl<'a> Display for SongInfoDisplay<'a> {
 
         writeln!(f, "Version              : {}", s.version)?;
         writeln!(f, "Name                 : {}", s.name)?;
+        writeln!(f, "BPM                  : {}", s.tempo)?;
 
         let instr_count = s.instruments.iter()
             .fold(
