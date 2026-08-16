@@ -1,5 +1,5 @@
 use m8_file_parser::writer::Writer;
-use m8_file_parser::{ AHDEnv, FMWave, FmAlgo, HyperSynth, Instrument, InstrumentWithEq, LfoShape, LimitType, Mod, Operator, SynthParams, Table, Version, LFO };
+use m8_file_parser::{ AHDEnv, FMWave, FmAlgo, HyperSynth, HyperSynthShape, Instrument, InstrumentWithEq, LfoShape, LimitType, Mod, Operator, SynthParams, Table, Version, LFO };
 use m8_file_parser::FMSynth;
 
 use crate::types::M8FstoErr;
@@ -94,7 +94,8 @@ impl Chord {
             swarm: 0,
             width: 0,
             subosc: 0x80,
-            chords
+            chords,
+            shape: Some(HyperSynthShape::Saw)
         }
     }
 
@@ -124,6 +125,7 @@ impl Chord {
             filter_cutoff: 0xFF,
             filter_res: 0x0,
             amp: 0,
+            shape: 0,
             limit: LimitType(0),
             mixer_pan: 0x80,
             mixer_dry: 0xC0,

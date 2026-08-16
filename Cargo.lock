@@ -190,8 +190,7 @@ checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 [[package]]
 name = "m8-file-parser"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c10d6c75b1bf5b6e9193aea249d486a561091e653a7c2841bc443f9a84a0e21"
+source = "git+https://github.com/Twinside/m8-file-parser.git#1f4e32c1b17fb7aa5e45d7df57dee154759ad16d"
 dependencies = [
  "arr_macro",
  "array-concat",
