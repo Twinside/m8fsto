@@ -4,6 +4,7 @@
 
  * M8 Firmware 6.6
  * Adding a show groove subcommand.
+ * Show song now display chain bookmarks.
 
 ## v0.6.1
 

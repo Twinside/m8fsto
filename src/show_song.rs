@@ -1,5 +1,5 @@
-use std::{collections::HashSet, fmt::Display, fs, path::PathBuf};
-
+use std::{cmp::min, collections::HashSet, fmt::Display, fs, path::PathBuf};
+use colored::Colorize;
 use m8_file_parser::{param_gatherer::{Describable, ParameterGatherer}, reader::Reader, Instrument, Version};
 
 use crate::{types::M8FstoErr, ShowCommand, ShowTarget};
@@ -276,10 +276,64 @@ impl<'a> Display for SongInfoDisplay<'a> {
     }
 }
 
+struct ColoredSong<'a> {
+    song: &'a m8_file_parser::SongSteps
+}
+
+impl<'a> ColoredSong<'a> {
+    pub fn print_screen(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.print_screen_from_to(f, 0, self.song.last_modified_row() as u8)
+    }
+
+    pub fn print_screen_from_to(&self, f: &mut std::fmt::Formatter<'_>, start: u8, end: u8) -> std::fmt::Result  {
+        write!(f, "   1  2  3  4  5  6  7  8  \n")?;
+
+        for row in start as usize .. min(0xFF, (end as usize) + 1) {
+            self.print_row(f, row as u8)?;
+            writeln!(f, "")?;
+        };
+
+        Ok(())
+    }
+
+    pub fn print_row(&self, f: &mut std::fmt::Formatter<'_>, row: u8) -> std::fmt::Result {
+        let start = row as usize * 8;
+
+        write!(f, "{row:02x} ")?;
+
+
+        let steps = &self.song.steps;
+        for bix in start .. start + 8 {
+            let v = steps[bix];
+
+            if v == 0xFF{
+                write!(f, "-- ")?
+            } else {
+                if self.song.is_bookmarked(row as usize, bix - start) {
+                    let hex = format!("{:02X} ", v);
+                    write!(f, "{}", hex.red())?
+                } else {
+                    write!(f, "{:02x} ", v)?
+                }
+            }
+        };
+
+        Ok(())
+    }
+}
+
+impl<'a> Display for ColoredSong<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SONG\n\n")?;
+        self.print_screen(f)
+    }
+}
+
 fn show_from_song(show: ShowCommand, w: &mut dyn std::io::Write, song: m8_file_parser::Song) -> Result<(), M8FstoErr> {
     match show.show_command {
         ShowTarget::Song => {
-            writeln!(w, "{}", song.song).map_err(|_| M8FstoErr::PrintError)
+            let wrapper = ColoredSong { song: &song.song };
+            writeln!(w, "{}", wrapper).map_err(|_| M8FstoErr::PrintError)
         }
         ShowTarget::Groove { id } => {
             writeln!(w, "{}", song.grooves[id]).map_err(|_| M8FstoErr::PrintError)
