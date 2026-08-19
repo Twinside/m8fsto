@@ -119,6 +119,7 @@ fn show_from_instrument(show: ShowCommand, w: &mut dyn std::io::Write, instr_eq:
         ShowTarget::Song => Ok(()),
         ShowTarget::Mixer => Ok(()),
         ShowTarget::Effects => Ok(()),
+        ShowTarget::Groove { id: _ } => Ok(()),
         ShowTarget::Info => {
             writeln!(w, "Version : {}", instr_eq.version).map_err(|_| M8FstoErr::PrintError)?;
             writeln!(w, "Name    : {}", instr_eq.instrument.name().unwrap_or("")).map_err(|_| M8FstoErr::PrintError)?;
@@ -279,6 +280,9 @@ fn show_from_song(show: ShowCommand, w: &mut dyn std::io::Write, song: m8_file_p
     match show.show_command {
         ShowTarget::Song => {
             writeln!(w, "{}", song.song).map_err(|_| M8FstoErr::PrintError)
+        }
+        ShowTarget::Groove { id } => {
+            writeln!(w, "{}", song.grooves[id]).map_err(|_| M8FstoErr::PrintError)
         }
         ShowTarget::Effects => {
             write!(w, "{}", ElemDisplay {

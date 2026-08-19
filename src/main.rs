@@ -42,6 +42,13 @@ enum ShowTarget {
     /// Display effect settings
     Effects,
 
+    /// Print the content of a groove
+    Groove {
+        #[clap(value_parser=maybe_hex::<usize>)]
+        id: usize
+    },
+
+
     /// Print the content of a chain
     Chain {
         #[clap(value_parser=maybe_hex::<usize>)]

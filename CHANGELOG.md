@@ -1,5 +1,10 @@
 # M8fsto changelog
 
+## v0.6.2
+
+ * M8 Firmware 6.6
+ * Adding a show groove subcommand.
+
 ## v0.6.1
 
  * M8 Firmware 6.5, displaying new `MTT` command

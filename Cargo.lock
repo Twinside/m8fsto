@@ -190,7 +190,7 @@ checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 [[package]]
 name = "m8-file-parser"
 version = "0.6.1"
-source = "git+https://github.com/Twinside/m8-file-parser.git#1f4e32c1b17fb7aa5e45d7df57dee154759ad16d"
+source = "git+https://github.com/Twinside/m8-file-parser.git#c450a8685c8639a8b354763c4748d7ab83a2b4c7"
 dependencies = [
  "arr_macro",
  "array-concat",
