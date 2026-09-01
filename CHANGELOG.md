@@ -1,6 +1,10 @@
 # M8fsto changelog
 
-## v0.6.2
+## v0.8
+
+ * Adding quick'n'dirty diff
+
+## v0.7
 
  * M8 Firmware 6.6
  * Adding a show groove subcommand.

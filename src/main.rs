@@ -6,6 +6,7 @@ use types::{FlagBag, M8FstoErr};
 
 mod ls_sample;
 mod grep_sample;
+mod diff;
 mod bundle;
 mod prune_bundle;
 mod broken_search;
@@ -157,6 +158,14 @@ enum M8Commands {
         out_folder: Option<String>
     },
 
+    Diff {
+        /// Original song
+        song_a: String,
+
+        /// "New" song
+        song_b: String
+    },
+
     /// Given a bundled song, remove all local samples
     /// that are not used within the bundled song.
     PruneBundle {
@@ -220,6 +229,11 @@ fn main() {
         None => { println!("Please use a command") }
         Some(M8Commands::Chords) => {
             print_errors(chord_gen::generate());
+        }
+        Some(M8Commands::Diff { song_a, song_b }) => {
+            let song_a = PathBuf::from(song_a);
+            let song_b = PathBuf::from(song_b);
+            print_errors(diff::diff(&song_a, &song_b, &mut stdout()));
         }
         Some(M8Commands::Renumber(recommand)) => {
             print_errors(renumber::renumber_element(recommand, &mut stdout()));

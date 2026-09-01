@@ -91,6 +91,7 @@ The followng elements can be printed:
  * `instrument`: display an instrument configuration (without table, but with modulators)
  * `table`: display a table (you can reuse instrument number to display an instrument table)
  * `eq`: display an equalizer configuration (no plotting)
+ * `diff`: basic low level song-diff, compare each element with the same index, no global
 
 The generic `info` is here to get high level overview:
 
@@ -238,6 +239,16 @@ You can also move single files:
 ```
 > m8fsto mv --force --root "$HOME/tracks/M8 backup" "$HOME/tracks/M8 backup/Samples/Drums/Hits/TR909/BD/BT7AADA.wav" "$HOME/tracks/M8 backup/Samples/MY_HH_10.wav"
 ```
+
+### diff
+
+```
+> m8fsto diff songa.m8s songb.m8s
+```
+
+Then a textual diff if printed, every element with the same index are compared together,
+no global diff or anything, every element (instrument/eq/table/phrase/chain/song) are compared
+and if different a raw textual diff is computed.
 
 ## Garbage printed after the command
 

@@ -89,9 +89,9 @@ impl<'a, 'writer> ParameterGatherer for AsciiTherer<'a, 'writer> {
     }
 }
 
-struct ElemDisplay<T> {
-    instr: T,
-    ver: Version
+pub struct ElemDisplay<T> {
+    pub instr: T,
+    pub ver: Version
 }
 
 impl<T : Describable> Display for ElemDisplay<T> {
