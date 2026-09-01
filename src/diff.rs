@@ -29,7 +29,7 @@ pub fn diff_song(w: &mut dyn std::io::Write, song_a: &Song, song_b: &Song) -> Re
             ver: song_b.version
         });
 
-        let title= format!("=== Instrument {}", i);
+        let title= format!("=== Instrument 0x{:02X}", i);
         print_patch(w, &title, &instr_a_txt, &instr_b_txt)
             .map_err(|_| M8FstoErr::PrintError)?;
     }
@@ -40,7 +40,7 @@ pub fn diff_song(w: &mut dyn std::io::Write, song_a: &Song, song_b: &Song) -> Re
         let table_a_txt = format!("{}", song_a.table_view(i));
         let table_b_txt = format!("{}", song_b.table_view(i));
 
-        let title= format!("=== Table {}", i);
+        let title= format!("=== Table 0x{:02X}", i);
         print_patch(w, &title, &table_a_txt, &table_b_txt)
             .map_err(|_| M8FstoErr::PrintError)?;
     }
@@ -58,7 +58,7 @@ pub fn diff_song(w: &mut dyn std::io::Write, song_a: &Song, song_b: &Song) -> Re
             ver: song_b.version
         });
 
-        let title= format!("=== Eq {}", i);
+        let title= format!("=== Eq 0x{:02X}", i);
         print_patch(w, &title, &eq_a_txt, &eq_b_txt)
             .map_err(|_| M8FstoErr::PrintError)?;
     }
@@ -69,7 +69,7 @@ pub fn diff_song(w: &mut dyn std::io::Write, song_a: &Song, song_b: &Song) -> Re
         let chain_a_txt = format!("{}", chain_a);
         let chain_b_txt = format!("{}", chain_b);
 
-        let title= format!("=== Chain {}", i);
+        let title= format!("=== Chain 0x{:02X}", i);
         print_patch(w, &title, &chain_a_txt, &chain_b_txt)
             .map_err(|_| M8FstoErr::PrintError)?;
     }
@@ -80,7 +80,7 @@ pub fn diff_song(w: &mut dyn std::io::Write, song_a: &Song, song_b: &Song) -> Re
         let chain_a_txt = format!("{}", song_a.phrase_view(i));
         let chain_b_txt = format!("{}", song_b.phrase_view(i));
 
-        let title= format!("=== Phrase {}", i);
+        let title= format!("=== Phrase 0x{:02X}", i);
         print_patch(w, &title, &chain_a_txt, &chain_b_txt)
             .map_err(|_| M8FstoErr::PrintError)?;
     }
